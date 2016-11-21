@@ -1,0 +1,272 @@
+File                      = _ { $(ImportDeclaration)* ( $(TopLevel) / _ )* #Source } EOT
+_                         = ( S / BLOCKCOMMENT / LINECOMMENT )*
+S                         = [ \n\r\t\u000B\u000C]
+BLOCKCOMMENT              = '/*' ( !'*/' . )* '*/'
+LINECOMMENT               = '//' ( !'\n' . )*
+EOT                       = !.
+Identifier                      = { NAME #Name } _
+NAME                      = !DIGIT !( KEYWORD !W ) W+
+DIGIT                     = [0-9]
+W                         = [a-zA-Z0-9_$]
+TopLevel                  = Declaration
+                          / { #Empty } ";"
+KEYWORD                   = 'else'
+                          / 'if'
+                          / 'int'
+                          / 'return'
+
+example File '''
+int fib(int n) {
+  if(n < 3) return 1;
+  return fib(n-1)+fib(n-2);
+}
+'''
+
+// Declaration
+ImportDeclaration         = "import" { $(Identifier) ('.' $(Identifier))* ";" #ImportDecl}
+Declaration               = MethodDeclaration
+                          / VariableDeclaration
+                          / Dummy1
+                          / Dummy2
+MethodDeclaration         = { $type(Type) _ $name(Identifier) _ "(" $list(MethodParamList) ")" (_ $body(Block) / _ ";") #MethodDecl }
+MethodParamList           = { ( $(MethodParam) ( "," $(MethodParam) )* )? ( "," "..." )? #List }
+MethodParam               = { $type(Type) _ $name(Identifier)? #Param } _
+VariableDeclaration       = { $type(Type) _ $list(VariableList) ";" #Declaration }
+VariableList              = { $(InitDecl) ( "," $(InitDecl) )*  #VarList}
+InitDecl                  = { $name(Identifier) ( "=" $expr(Initializer) )? #VarDecl } _
+Initializer               = AssignmentExpression
+Dummy1                    = "dummy1" { $list(VariableList) #Dummy1} ";"
+Dummy2                    = "dummy2" { $list(VariableList) #Dummy2} ";"
+
+example Declaration int a = 0;
+example VariableDeclaration ~0cf1e0 int a;
+example VariableDeclaration ~83437a int a,b,c;
+example VariableDeclaration ~ef2263 int a=0;
+example VariableDeclaration ~4bd8c5 int a=0,b=1,c=2;
+
+// Type
+Type                      = PrimitiveType
+                          / ReferenceType
+PrimitiveType             = { "int" #TInt }
+                          / { "boolean" #TBoolean }
+                          / { "long" #TLong}
+ReferenceType             = Identifier
+// Block, Statement
+Block                     = { "{" ( $(Statement) / $(Declaration) / _ )* "}" #Block }
+Statement                 = Block
+                          / { "if" _ "(" $cond(Expression) ")" $then(Block) ( "else" _ $else(Block) )? #If }
+                          / { "if1" _ "(" $cond(Expression) ")" $then(Block) ( "else" _ $else(Block) )? #If1 }
+                          / { "if2" _ "(" $cond(Expression) ")" $then(Block) ( "else" _ $else(Block) )? #If2 }
+                          / { "if3" _ "(" $cond(Expression) ")" $then(Block) ( "else" _ $else(Block) )? #If3 }
+                          / { "if4" _ "(" $cond(Expression) ")" $then(Block) ( "else" _ $else(Block) )? #If4 }
+                          / { "if5" _ "(" $cond(Expression) ")" $then(Block) ( "else" _ $else(Block) )? #If5 }
+                          / { "if6" _ "(" $cond(Expression) ")" $then(Block) ( "else" _ $else(Block) )? #If6 }
+                          / { "if7" _ "(" $cond(Expression) ")" $then(Block) ( "else" _ $else(Block) )? #If7 }
+                          / { "if8" _ "(" $cond(Expression) ")" $then(Block) ( "else" _ $else(Block) )? #If8 }
+                          / { "if9" _ "(" $cond(Expression) ")" $then(Block) ( "else" _ $else(Block) )? #If9 }
+                          / { "ifA" _ "(" $cond(Expression) ")" $then(Block) ( "else" _ $else(Block) )? #IfA }
+                          / { "ifB" _ "(" $cond(Expression) ")" $then(Block) ( "else" _ $else(Block) )? #IfB }
+                          / { "return" _ $expr(Expression)? ";" #Return }
+                          / { $expr(Expression) ";" #ExpressionStatement }
+                          / { #Empty } ";"
+
+example Block ~8909e9 '''
+{
+}
+'''
+example Block ~0038ad '''
+{
+a;
+}
+'''
+example Block ~6bba1c '''
+{
+a=0;
+}
+'''
+example Statement ~1591a2 '''
+if(c){
+}
+'''
+
+// Expression
+Expression                = AssignmentExpression {$ "," $(AssignmentExpression) #Expression }*
+AssignmentExpression      = { $left(UnaryExpression) _AssignmentOperator $right(AssignmentExpression) }
+                          / ConditionalExpression
+_AssignmentOperator       = "=" #Assign
+                          / "*=" #AssignMul
+                          / "/=" #AssignDiv
+                          / "%=" #AssignMod
+                          / "+=" #AssignAdd
+                          / "-=" #AssignSub
+                          / "<<=" #AssignLeftShift
+                          / ">>=" #AssignRightShift
+                          / ">>>=" #AssignLogicalRightShift
+                          / "&=" #AssignBitwiseAnd
+                          / "^=" #AssignBitwiseXOr
+                          / "|=" #AssignBitwiseOr
+ConstantExpression        = ConditionalExpression
+ConditionalExpression     = LogicalOrExpression {$cond "?" $then(Expression) ":" $else(LogicalOrExpression) #Conditional }*
+LogicalOrExpression       = LogicalAndExpression {$left "||" $right(LogicalAndExpression) #Or }*
+LogicalAndExpression      = EqualityExpression {$left "&&" $right(EqualityExpression) #And }*
+EqualityExpression        = RelationalExpression {$left ("==" #Equals / "!=" #NotEquals) $right(RelationalExpression) }*
+RelationalExpression      = UnaryExpression {$left ("<" #LessThan / "<=" #LessThanEquals / ">" #GreaterThan / ">=" #GreaterThanEquals)  $right(UnaryExpression) }*
+UnaryExpression           = PostfixExpression
+                          / { "!" $expr(UnaryExpression) #Not }
+PostfixExpression         = PrimaryExpression {$recv _FunctionCall }*
+_FunctionCall             = $({ "(" _ArgumentExpressionList? ")" #List }) #Apply
+_ArgumentExpressionList   = $(AssignmentExpression) ( "," $(AssignmentExpression) )*
+PrimaryExpression         = Constant
+                          / "(" Expression ")"
+                          / Identifier
+                          / FunctionExpression
+
+FunctionExpression        = { $type(Type) _ $name(Identifier)? _ "(" $list(MethodParamList) ")" $body(Block) "::" #MethodDecl }
+
+//Literal
+Constant                  = IntegerLiteral
+                          / BooleanLiteral
+                          / StringLiteral
+                          / NullLiteral
+
+IntegerLiteral            = { DECIMAL #Integer } _
+DECIMAL                   = [1-9] DIGIT* / '0'
+BooleanLiteral            = "true" { #True } _
+                          / "false" { #False } _
+StringLiteral             = '"' { STRING_CONTENT* #String } '"' _
+STRING_CONTENT            = ![\"\n\\] .
+NullLiteral               = 'null' { #Null} _
+
+example Constant 1
+
+"="                       = '=' !'=' _
+"*="                      = '*=' _
+"/="                      = '/=' _
+"%="                      = '%=' _
+"+="                      = '+=' _
+"-="                      = '-=' _
+"<<="                     = '<<=' _
+">>="                     = '>>=' _
+">>>="                    = '>>>=' _
+"&="                      = '&=' _
+"^="                      = '^=' _
+"|="                      = '|=' _
+"."                       = '.' _
+"'"                       = '\'' _
+"("                       = '(' _
+")"                       = ')' _
+"{"                       = '{' _
+"["                       = '[' _
+"]"                       = ']' _
+","                       = ',' _
+"..."                     = '...' _
+"::"                      = '::' _
+":"                       = ':' ![>] _
+"/"                       = '/' !'=' _
+"<"                       = '<' ![=] _
+">"                       = '>' ![=] _
+"<="                      = '<=' ![=] _
+">="                      = '>=' ![=] _
+"=="                      = '==' _
+"!="                      = '!=' _
+"&&"                      = '&&' _
+"||"                      = '||' _
+";"                       = ';' _
+"?"                       = '?' _
+"}"                       = '}' _
+"++"                      = '++' _
+"--"                      = '--' _
+"+"                       = '+' ![+=] _
+"-"                       = '-' !( '-' / [=>] ) _
+"*"                       = '*' _
+"!"                       = '!' !'=' _
+"int"                     = 'int' !W
+"boolean"                 = 'boolean' !W
+"if"                      = 'if' !W
+"for"                     = 'for' !W
+"else"                    = 'else' !W
+"return"                  = 'return' !W
+"false"                   = 'false' !W
+"true"                    = 'true' !W
+"import"                  = 'import' !W
+"long"                    = 'long' !W
+"dummy1"                  = 'dummy1' !W
+"dummy2"                  = 'dummy2' !W
+"if0"                      = 'if0' !W
+"if1"                      = 'if1' !W
+"if2"                      = 'if2' !W
+"if3"                      = 'if3' !W
+"if4"                      = 'if4' !W
+"if5"                      = 'if5' !W
+"if6"                      = 'if6' !W
+"if7"                      = 'if7' !W
+"if8"                      = 'if8' !W
+"if9"                      = 'if9' !W
+"ifA"                      = 'ifA' !W
+"ifB"                      = 'ifB' !W
+"ifC"                      = 'ifC' !W
+"ifD"                      = 'ifD' !W
+"ifE"                      = 'ifE' !W
+
+
+
+
+example Statement '''
+return 1;
+'''
+example Expression ~46f038 '''
+x=y
+'''
+example Expression ~8e03b0 '''
+x+=y
+'''
+example Expression ~4e09fb '''
+c?x:y
+'''
+example Expression ~7ac13c '''
+x<<y
+'''
+example Expression ~9b2696 '''
+x>>y
+'''
+example Expression ~dea67f '''
+x|y
+'''
+example Expression ~7f3ecc '''
+x&y
+'''
+example Expression ~78b953 '''
+x^y
+'''
+example Expression ~f21916 '''
+~x
+'''
+example Expression ~006e0a '''
+x&&y
+'''
+example Expression ~b60455 '''
+x||y
+'''
+example Expression ~51b2b2 '''
+!x
+'''
+example Expression ~b0be29 '''
+x==y
+'''
+example Expression ~f89dae '''
+x!=y
+'''
+example Expression ~ad9f44 '''
+x<y
+'''
+example Expression ~37ebeb '''
+x<=y
+'''
+example Expression ~ae662a '''
+x+y
+'''
+example Expression ~fa8a6a '''
+x*y
+'''
+
+// formatted by $ nez format

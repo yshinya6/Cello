@@ -1,0 +1,192 @@
+options {
+  JDK_VERSION = "1.8";
+}
+
+PARSER_BEGIN(XMLParser)
+
+import java.io.*;
+
+/**
+ * Grammar to parse Cello language
+ * @author Shun Kubota, Shinya Yamaguchi
+ */
+public class XMLParser
+{
+   public XMLParser(String fileName)
+   {
+      this(System.in);
+      try { ReInit(new FileInputStream(new File(fileName))); }
+      catch(Exception e) { e.printStackTrace(); }
+   }
+
+  public static void main(String args[]) {
+    if (args.length != 1) {
+      System.err.println("This is a JavaCC parser for XML");
+      System.err.println("Usage: <Input>");
+      System.exit(1);
+    }
+    parse(args[0]);
+  }
+
+  public static void parse(String filePath) {
+    XMLParser parser;
+    long fastest = 0;
+    for (int i = 0; i < 5; i++) {
+      try {
+        parser = new XMLParser(new java.io.FileInputStream(filePath));
+      } catch (java.io.FileNotFoundException e) {
+        System.out.println("File " + filePath + " not found.");
+        return;
+      }
+      try {
+        long start = System.nanoTime();
+        parser.Document();
+        long end = System.nanoTime();
+        if ((end - start) < fastest || fastest == 0) {
+          fastest = (end - start);
+        }
+      } catch (ParseException e) {
+        System.out.println(e.getMessage());
+        System.out.println(String.format("%s ERROR", filePath));
+        System.exit(1);
+      }
+    }
+    double result = fastest/1000000.0;
+    System.out.println(String.format("%s %s", filePath, result));
+  }
+}
+
+boolean isInsideTag = false;
+
+PARSER_END(XMLParser)
+
+
+// Lexer Rule
+/* WHITE SPACE */
+
+SKIP :
+{
+  " "
+| "\t"
+| "\n"
+| "\r"
+| "\f"
+}
+
+SKIP :
+{
+  "<!" : Cdata
+}
+
+<Cdata> SKIP :
+{
+  ">" : DEFAULT
+}
+
+<Cdata> MORE :
+{
+  <~[]>
+}
+
+SKIP :
+{
+  "<--" : WithinComment
+}
+
+<WithinComment> SKIP :
+{
+  "-->" : DEFAULT
+}
+
+<WithinComment> MORE :
+{
+  <~[]>
+}
+
+TOKEN :
+{
+  < OPEN: "<" >
+| < XMLDECL_OPEN: "<?xml" >
+| < CLOSE: ">" >
+| < SPECIAL_CLOSE: "?>" >
+| < SLASH_CLOSE: "/>" >
+| < SLASH: "/" >
+| < EQUALS: "=" >
+| < TEXT: ~["&","<"]>
+| < STRING: "\"" (~["<","&"])* "\"" | "\'" (~["<","&"])* "\'">
+| < SEA_WS: ([" ", "\t", "\r", "\n"])+>
+| < DIGIT: ["0"-"9"]>
+| < HEXDIGIT: ["a"-"f","A"-"F","0"-"9"]>
+}
+
+TOKEN :
+{
+  < ENTITYREF: "&" <NAME> ";" >
+| < CHARREF: "&#" (<DIGIT>)+ ";" | "&#x" (<HEXDIGIT>)+ ";">
+}
+
+/* LITERALS */
+
+TOKEN :
+{
+  < NAME: <LETTER> (<PART_LETTER>)* >
+| < #LETTER:
+      [":", "A"-"Z", "a"-"z"]
+  >
+|
+  < #PART_LETTER:
+      [
+         "$",
+         "0"-"9",
+         "A"-"Z",
+         "_",
+         "-",
+         ".",
+         "a"-"z"
+      ]
+  >
+}
+
+void Document():
+{}
+{
+ (Prolog())? Element()
+}
+
+void Prolog():
+{}
+{
+ <XMLDECL_OPEN> (Attribute())* <SPECIAL_CLOSE>
+}
+
+void Content():
+{}
+{
+  (CharData())? (LOOKAHEAD(2) ( Element() | Reference()) (CharData())?)*
+}
+
+void Element():
+{}
+{
+  LOOKAHEAD(3)
+    "<" <NAME> (Attribute())* ">" Content() "<" "/" <NAME> ">"
+  | "<" <NAME> (Attribute())* "/>"
+}
+
+void Reference():
+{}
+{
+  <ENTITYREF> | <CHARREF>
+}
+
+void Attribute():
+{}
+{
+  <NAME> "=" <STRING>
+}
+
+void CharData():
+{}
+{
+  (<TEXT>)+ | <SEA_WS>
+}
